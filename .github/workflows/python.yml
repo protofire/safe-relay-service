@@ -97,3 +97,8 @@ jobs:
       run: bash scripts/deploy_docker_github.sh ${GITHUB_REF##*/}
       env:
         DOCKERHUB_PROJECT: safe-relay-service
+    - name: Deploy InfuraTx test
+      if: github.ref == 'refs/heads/poc-infura-tx'
+      run: bash scripts/deploy_docker_github.sh itx
+      env:
+        DOCKERHUB_PROJECT: safe-relay-service
