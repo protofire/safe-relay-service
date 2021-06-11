@@ -457,7 +457,8 @@ class InfuraRelayView(APIView):
         elif self.request.method == 'POST':
             return InfuraTxSerializer
 
-    @swagger_auto_schema(responses={200: InfuraTxStatusResponseSerializer(),
+    @swagger_auto_schema(operation_id='v1_infura_transactions_get',
+                         responses={200: InfuraTxStatusResponseSerializer(),
                                     422: 'Safe address checksum not valid'})
     def get(self, request, infura_tx_hash):
         transaction_status = InfuraRelayServiceProvider().get_transaction_status(infura_tx_hash)
@@ -467,7 +468,8 @@ class InfuraRelayView(APIView):
             response_serializer = InfuraTxStatusResponseSerializer(transaction_status)
             return Response(status=status.HTTP_200_OK, data=response_serializer.data)
 
-    @swagger_auto_schema(responses={201: InfuraTxResponseSerializer(),
+    @swagger_auto_schema(operation_id='v1_infura_transactions_create',
+                         responses={201: InfuraTxResponseSerializer(),
                                     400: 'Data not valid',
                                     404: 'Safe not found',
                                     422: 'Safe address checksum not valid/Tx not valid'})
