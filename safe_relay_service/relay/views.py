@@ -450,23 +450,8 @@ class PrivateSafesView(ListAPIView):
     serializer_class = SafeContractSerializer
 
 
-class InfuraRelayView(APIView):
-    def get_serializer_class(self):
-        if self.request.method == 'GET':
-            return InfuraTxStatusResponseSerializer
-        elif self.request.method == 'POST':
-            return InfuraTxSerializer
-
-    @swagger_auto_schema(operation_id='v1_infura_transactions_get',
-                         responses={200: InfuraTxStatusResponseSerializer(),
-                                    422: 'Safe address checksum not valid'})
-    def get(self, request, infura_tx_hash):
-        transaction_status = InfuraRelayServiceProvider().get_transaction_status(infura_tx_hash)
-        if not transaction_status:
-            return Response(status=status.HTTP_404_NOT_FOUND, data='Transaction not found')
-        else:
-            response_serializer = InfuraTxStatusResponseSerializer(transaction_status)
-            return Response(status=status.HTTP_200_OK, data=response_serializer.data)
+class InfuraRelayCreateView(APIView):
+    serializer_class = InfuraTxSerializer
 
     @swagger_auto_schema(operation_id='v1_infura_transactions_create',
                          responses={201: InfuraTxResponseSerializer(),
@@ -474,7 +459,7 @@ class InfuraRelayView(APIView):
                                     404: 'Safe not found',
                                     422: 'Safe address checksum not valid/Tx not valid'})
     def post(self, request, format=None):
-        serializer = self.get_serializer_class()(data=request.data)
+        serializer = self.serializer_class(data=request.data)
 
         if not serializer.is_valid():
             return Response(status=status.HTTP_400_BAD_REQUEST, data=serializer.errors)
@@ -485,3 +470,18 @@ class InfuraRelayView(APIView):
             )
             response_serializer = InfuraTxResponseSerializer(infura_tx_sent)
             return Response(status=status.HTTP_201_CREATED, data=response_serializer.data)
+
+
+class InfuraRelayRetrieveView(APIView):
+    serializer_class = InfuraTxStatusResponseSerializer
+
+    @swagger_auto_schema(operation_id='v1_infura_transactions_get',
+                         responses={200: InfuraTxStatusResponseSerializer(),
+                                    422: 'Safe address checksum not valid'})
+    def get(self, request, infura_tx_hash):
+        transaction_status = InfuraRelayServiceProvider().get_transaction_status(infura_tx_hash)
+        if not transaction_status:
+            return Response(status=status.HTTP_404_NOT_FOUND, data='Transaction not found')
+        else:
+            response_serializer = self.serializer_class(transaction_status)
+            return Response(status=status.HTTP_200_OK, data=response_serializer.data)
