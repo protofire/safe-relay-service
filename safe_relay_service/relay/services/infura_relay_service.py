@@ -41,10 +41,15 @@ class InfuraTxSent:
     tx_hash: Optional[str]
 
 
+class ItxStatusBroadcast(TypedDict):
+    broadcast_time: str  # '2021-02-15T16:28:47.978Z'
+    eth_tx_hash: str  # '0x5aaf963acc5ec3ec64c6c954f617e6539663bacf42a73fce74bb0c8829088a8e'
+    gas_price: str  # '7290000028'
+
+
 class ItxTxStatus(TypedDict):
-    broadcastTime: str  # '2021-02-15T16:28:47.978Z'
-    ethTxHash: str  # '0x5aaf963acc5ec3ec64c6c954f617e6539663bacf42a73fce74bb0c8829088a8e'
-    gasPrice: str  # '7290000028'
+    received_time: str  # '2021-02-15T16:28:47.978Z'
+    broadcasts: ItxStatusBroadcast
 
 
 # TODO Move this to EthereumClient on gnosis-py
@@ -85,14 +90,18 @@ class ItxClient:
             "params": [
                 address
             ]
-        }).json()['result']) / 1e18
+        }).json()['result']['balance']) / 1e18
 
     def get_transaction_status(self, relay_tx_hash: str) -> Optional[ItxTxStatus]:
         """
         :param relay_tx_hash:
-        :return: Dictionary  {'broadcast_time': '2021-02-14T16:28:47.978Z',
-                              'eth_tx_hash': '0x1aaf963acc5ec3e164c6c954f617e6532663b2cf42a73fce74bb0c8829021a2f',
-                              'gas_price': '7290000028'}
+        :return: Dictionary:
+        {'receivedTime': '2021-04-14T15:42:00.000Z',
+         'broadcasts': {'broadcast_time': '2021-02-14T16:28:47.978Z',
+                        'eth_tx_hash': '0x1aaf963acc5ec3e164c6c954f617e6532663b2cf42a73fce74bb0c8829021a2f',
+                        'gas_price': '7290000028'
+                       }
+        }
         """
         response = self.http_session.post(self.base_url, json={
             "id": "1",
@@ -103,7 +112,7 @@ class ItxClient:
             ]
         })
         if result := response.json()['result']:
-            return humps.decamelize(result[0])
+            return humps.decamelize(result)
 
     def send_transaction(self, relay_tx: ItxRelayTx, account: Account) -> HexStr:
         """
@@ -134,7 +143,7 @@ class ItxClient:
                 raise ItxTransactionAlreadySent
             else:
                 raise ItxException(error_message)
-        return response_json['result']
+        return response_json['result']['relayTransactionHash']
 
 
 class InfuraRelayServiceException(Exception):
@@ -157,63 +166,65 @@ class InfuraRelayServiceProvider:
             del cls.instance
 
 
-refunder_abi = [{'inputs': [{'internalType': 'contract Token',
-                             'name': '_token',
-                             'type': 'address'},
-                            {'internalType': 'address', 'name': '_owner', 'type': 'address'},
-                            {'internalType': 'uint256', 'name': '_fee', 'type': 'uint256'},
-                            {'internalType': 'bytes4', 'name': '_method', 'type': 'bytes4'}],
-                 'stateMutability': 'nonpayable',
-                 'type': 'constructor'},
-                {'inputs': [{'internalType': 'address',
-                             'name': 'newOwner',
-                             'type': 'address'}],
-                 'name': 'changeOwner',
-                 'outputs': [],
-                 'stateMutability': 'nonpayable',
-                 'type': 'function'},
-                {'inputs': [{'internalType': 'address', 'name': 'target', 'type': 'address'},
-                            {'internalType': 'bytes', 'name': 'functionData', 'type': 'bytes'}],
-                 'name': 'execute',
-                 'outputs': [],
-                 'stateMutability': 'nonpayable',
-                 'type': 'function'},
-                {'inputs': [{'internalType': 'address', 'name': 'target', 'type': 'address'},
-                            {'internalType': 'bytes', 'name': 'functionData', 'type': 'bytes'}],
-                 'name': 'executeTrusted',
-                 'outputs': [],
-                 'stateMutability': 'nonpayable',
-                 'type': 'function'},
-                {'inputs': [],
-                 'name': 'fee',
-                 'outputs': [{'internalType': 'uint256', 'name': '', 'type': 'uint256'}],
-                 'stateMutability': 'view',
-                 'type': 'function'},
-                {'inputs': [],
-                 'name': 'method',
-                 'outputs': [{'internalType': 'bytes4', 'name': '', 'type': 'bytes4'}],
-                 'stateMutability': 'view',
-                 'type': 'function'},
-                {'inputs': [],
-                 'name': 'owner',
-                 'outputs': [{'internalType': 'address', 'name': '', 'type': 'address'}],
-                 'stateMutability': 'view',
-                 'type': 'function'},
-                {'inputs': [],
-                 'name': 'token',
-                 'outputs': [{'internalType': 'contract Token',
-                              'name': '',
-                              'type': 'address'}],
-                 'stateMutability': 'view',
-                 'type': 'function'},
-                {'inputs': [{'internalType': 'contract Token',
-                             'name': 'withdrawToken',
-                             'type': 'address'},
-                            {'internalType': 'address', 'name': 'target', 'type': 'address'}],
-                 'name': 'withdrawTokensTo',
-                 'outputs': [],
-                 'stateMutability': 'nonpayable',
-                 'type': 'function'}]
+refunder_abi = [
+    {'inputs': [{'internalType': 'contract Token',
+                 'name': '_token',
+                 'type': 'address'},
+                {'internalType': 'address', 'name': '_owner', 'type': 'address'},
+                {'internalType': 'uint256', 'name': '_fee', 'type': 'uint256'},
+                {'internalType': 'bytes4', 'name': '_method', 'type': 'bytes4'}],
+     'stateMutability': 'nonpayable',
+     'type': 'constructor'},
+    {'inputs': [{'internalType': 'address',
+                 'name': 'newOwner',
+                 'type': 'address'}],
+     'name': 'changeOwner',
+     'outputs': [],
+     'stateMutability': 'nonpayable',
+     'type': 'function'},
+    {'inputs': [{'internalType': 'address', 'name': 'target', 'type': 'address'},
+                {'internalType': 'bytes', 'name': 'functionData', 'type': 'bytes'}],
+     'name': 'execute',
+     'outputs': [],
+     'stateMutability': 'nonpayable',
+     'type': 'function'},
+    {'inputs': [{'internalType': 'address', 'name': 'target', 'type': 'address'},
+                {'internalType': 'bytes', 'name': 'functionData', 'type': 'bytes'}],
+     'name': 'executeTrusted',
+     'outputs': [],
+     'stateMutability': 'nonpayable',
+     'type': 'function'},
+    {'inputs': [],
+     'name': 'fee',
+     'outputs': [{'internalType': 'uint256', 'name': '', 'type': 'uint256'}],
+     'stateMutability': 'view',
+     'type': 'function'},
+    {'inputs': [],
+     'name': 'method',
+     'outputs': [{'internalType': 'bytes4', 'name': '', 'type': 'bytes4'}],
+     'stateMutability': 'view',
+     'type': 'function'},
+    {'inputs': [],
+     'name': 'owner',
+     'outputs': [{'internalType': 'address', 'name': '', 'type': 'address'}],
+     'stateMutability': 'view',
+     'type': 'function'},
+    {'inputs': [],
+     'name': 'token',
+     'outputs': [{'internalType': 'contract Token',
+                  'name': '',
+                  'type': 'address'}],
+     'stateMutability': 'view',
+     'type': 'function'},
+    {'inputs': [{'internalType': 'contract Token',
+                 'name': 'withdrawToken',
+                 'type': 'address'},
+                {'internalType': 'address', 'name': 'target', 'type': 'address'}],
+     'name': 'withdrawTokensTo',
+     'outputs': [],
+     'stateMutability': 'nonpayable',
+     'type': 'function'}
+]
 
 
 class InfuraRelayService:
@@ -267,7 +278,7 @@ class InfuraRelayService:
         itx_relay_tx = ItxRelayTx(self.refunder_contract.address, refunder_transaction_data, gas * 2)
         infura_tx_hash = self.itx_client.send_transaction(itx_relay_tx, self.infura_relay_sender_account)
         transaction_status = self.itx_client.get_transaction_status(infura_tx_hash)
-        if transaction_status:
-            return InfuraTxSent(infura_tx_hash, transaction_status['eth_tx_hash'])
+        if transaction_status and transaction_status.get('broadcasts'):
+            return InfuraTxSent(infura_tx_hash, transaction_status['eth_tx_hash']['broadcasts'][0])
         else:
             return InfuraTxSent(infura_tx_hash, None)

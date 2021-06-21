@@ -288,7 +288,12 @@ class InfuraTxResponseSerializer(serializers.Serializer):
     tx_hash = Sha3HashField(allow_null=True)
 
 
-class InfuraTxStatusResponseSerializer(serializers.Serializer):
+class InfuraTxStatusNestedResponseSerializer(serializers.Serializer):
     broadcast_time = serializers.CharField()
     eth_tx_hash = serializers.CharField()
     gas_price = serializers.CharField()
+
+
+class InfuraTxStatusResponseSerializer(serializers.Serializer):
+    received_time = serializers.CharField()
+    broadcasts = serializers.ListField(child=InfuraTxStatusNestedResponseSerializer())
