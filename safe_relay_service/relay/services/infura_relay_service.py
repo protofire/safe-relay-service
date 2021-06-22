@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from functools import cached_property
 from typing import Optional, TypedDict
 
@@ -97,10 +98,12 @@ class ItxClient:
         :param relay_tx_hash:
         :return: Dictionary:
         {'receivedTime': '2021-04-14T15:42:00.000Z',
-         'broadcasts': {'broadcast_time': '2021-02-14T16:28:47.978Z',
-                        'eth_tx_hash': '0x1aaf963acc5ec3e164c6c954f617e6532663b2cf42a73fce74bb0c8829021a2f',
-                        'gas_price': '7290000028'
-                       }
+         'broadcasts': [
+             {'broadcast_time': '2021-02-14T16:28:47.978Z',
+              'eth_tx_hash': '0x1aaf963acc5ec3e164c6c954f617e6532663b2cf42a73fce74bb0c8829021a2f',
+              'gas_price': '7290000028'
+             }
+          ]
         }
         """
         response = self.http_session.post(self.base_url, json={
@@ -278,7 +281,11 @@ class InfuraRelayService:
         itx_relay_tx = ItxRelayTx(self.refunder_contract.address, refunder_transaction_data, gas * 2)
         infura_tx_hash = self.itx_client.send_transaction(itx_relay_tx, self.infura_relay_sender_account)
         transaction_status = self.itx_client.get_transaction_status(infura_tx_hash)
-        if transaction_status and transaction_status.get('broadcasts'):
-            return InfuraTxSent(infura_tx_hash, transaction_status['eth_tx_hash']['broadcasts'][0])
+        if transaction_status and (broadcasts := transaction_status.get('broadcasts')):
+            # Sort txs broadcasted and keep the most recent one, the rest can be discarded
+            broadcasts_sorted = sorted(broadcasts,
+                                       key=lambda d: datetime.strptime(d['broadcast_time'], '%Y-%m-%dT%H:%M:%S.%fZ'),
+                                       reverse=True)
+            return InfuraTxSent(infura_tx_hash, broadcasts_sorted[0]['eth_tx_hash'])
         else:
             return InfuraTxSent(infura_tx_hash, None)

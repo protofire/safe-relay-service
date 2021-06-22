@@ -694,9 +694,13 @@ class TestViews(RelayTestCaseMixin, APITestCase):
     @mock.patch.object(ItxClient, 'get_transaction_status', autospec=True)
     def test_infura_tx_view(self, get_transaction_status: MagicMock):
         get_transaction_status.return_value = {
-            'broadcast_time': '2021-02-14T16:28:47.978Z',
-            'eth_tx_hash': '0x1aaf963acc5ec3e164c6c954f617e6532663b2cf42a73fce74bb0c8829021a2f',
-            'gas_price': '7290000028'
+            'received_time': '2021-04-14T15:42:00.000Z',
+            'broadcasts': [
+                {'broadcast_time': '2021-02-14T16:28:47.978Z',
+                 'eth_tx_hash': '0x1aaf963acc5ec3e164c6c954f617e6532663b2cf42a73fce74bb0c8829021a2f',
+                 'gas_price': '7290000028'
+                 }
+            ]
         }
         infura_tx_hash = '0x5aaf963acc5ec3ec64c6c954f617e6539663bacf42a73fce74bb0c8829088a8e'
         response = self.client.get(reverse('v1:infura-tx', args=(infura_tx_hash,)), format='json')
@@ -715,11 +719,23 @@ class TestViews(RelayTestCaseMixin, APITestCase):
                              send_transaction_mock: MagicMock, get_transaction_status: MagicMock):
         ethereum_network_mock.return_value = EthereumNetwork.RINKEBY
         estimate_gas_mock.return_value = 300000
-        send_transaction_mock.return_value = '0x1aaf963acc5ec3e164c6c954f617e6532663b2cf42a73fce74bb0c8829021a2f'
+        send_transaction_mock.return_value = '0x5aaf963acc5ec3ec64c6c954f617e6539663bacf42a73fce74bb0c8829088a8e'
         get_transaction_status.return_value = {
-            'broadcast_time': '2021-02-14T16:28:47.978Z',
-            'eth_tx_hash': '0x1aaf963acc5ec3e164c6c954f617e6532663b2cf42a73fce74bb0c8829021a2f',
-            'gas_price': '7290000028'
+            'received_time': '2021-04-14T15:42:00.000Z',
+            'broadcasts': [
+                {'broadcast_time': '2021-02-14T16:28:47.978Z',
+                 'eth_tx_hash': '0x1aaf963acc5ec3e164c6c954f617e6532663b2cf42a73fce74bb0c8829021a2f',
+                 'gas_price': '7290000028'
+                 },
+                {'broadcast_time': '2021-02-14T17:28:47.978Z',  # Last broadcasted, the rest can be discarded
+                 'eth_tx_hash': '0x2bbf963acc5ec3e164c6c954f617e6532663b2cf42a73fce74bb0c8829021a5a',
+                 'gas_price': '7290000028'
+                 },
+                {'broadcast_time': '2021-02-14T16:55:47.978Z',
+                 'eth_tx_hash': '0x2bbf963acc5ec3e164c6c954f617e6532663b2cf42a73fce74bb0c8829021a5a',
+                 'gas_price': '7290000028'
+                 }
+            ]
         }
         data = {
             'to': Account.create().address,
@@ -727,5 +743,7 @@ class TestViews(RelayTestCaseMixin, APITestCase):
         }
         response = self.client.post(reverse('v1:infura-txs'), format='json', data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['infura_tx_hash'], send_transaction_mock.return_value)
-        self.assertEqual(response.data['tx_hash'], get_transaction_status.return_value['eth_tx_hash'])
+        self.assertEqual(response.data['infura_tx_hash'],
+                         '0x5aaf963acc5ec3ec64c6c954f617e6539663bacf42a73fce74bb0c8829088a8e')
+        self.assertEqual(response.data['tx_hash'],
+                         '0x2bbf963acc5ec3e164c6c954f617e6532663b2cf42a73fce74bb0c8829021a5a')  # Last broadcasted tx
